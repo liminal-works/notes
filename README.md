@@ -12,12 +12,23 @@ browser.
 **The sheet.** Letter, landscape, folded on the dotted line into two halves, **A**
 (left) and **B** (right). Each half has:
 
-- a QR code (top-right) holding a link like `http://67.217.63.103:8737/s/S0142-A`
+- a QR code (top-right) holding a link like `http://67.217.63.103:8737/s/S3F9A1C07-A`
 - three small square markers (ArUco) in the other corners, used to straighten the photo
-- a small grey label `S0142-A` so you can read the sheet number
+- a small grey label `S3F9A1C07-A` with the sheet ID
 
-Every printed sheet has its own number, so a rescan replaces that page instead of
+**Sheet IDs** are `S` + random hex (8 digits on new sheets, about 4 billion
+possibilities), so there's no numbering to keep in order; print a batch whenever.
+Both halves of a sheet share the ID. The first batch was printed as S0001–S0050;
+those are just 4-digit hex and keep working. A rescan replaces that page instead of
 creating a duplicate.
+
+Notes are listed **newest upload first**.
+
+**Folders** are one level deep. Make one with **New folder**, then put notes in it
+from a note's folder menu, or tap **Select** on the main page, pick several and use
+**Move to…**. Notes not in a folder show on the main page. Searching from the main
+page searches everything. Scanning from inside a folder files the note there.
+Deleting a folder keeps its notes; they go back to the main page.
 
 **Scanning.** Point the iPhone camera at a half's QR code. It opens that sheet's page;
 tap **Scan side A**, take the photo, done. You can photograph one half or the whole
@@ -32,14 +43,14 @@ through from the back) → whiten the background → hide the corner markers.
 
 ```
 data/
-  sheets/S0142/
-    meta.json        title, dates, which sides exist
+  sheets/S3F9A1C07/
+    meta.json        title, folder, dates, which sides exist
     A.jpg            cleaned page (what you see and what goes in the PDF)
     A.flat.jpg       straightened only, no cleanup ("unfiltered" link), useful for light pencil
     A.thumb.jpg
     originals/       every photo you uploaded
   unmatched/         photos where no markers were found
-  state.json         highest sheet number printed so far
+  folders.json       folder names
   upload_key.txt     generated upload key (if NOTES_UPLOAD_KEY isn't set)
 ```
 
@@ -50,14 +61,15 @@ Back up the `data/` folder and you've backed up everything.
 | URL | What |
 |---|---|
 | `/` | All notes, newest first. Search, select several, download as one PDF. |
-| `/s/S0142-A` | One sheet (what the QR opens). Scan, rename, open/download PDF, delete. |
-| `/print` | Make a template PDF. Suggests the next unused sheet number. |
-| `/pdf/S0142.pdf` | PDF of one sheet (side A then B). Add `?download=1` to download. |
-| `/pdf?ids=S0142,S0143` | Several sheets in one PDF. |
-| `/template.pdf?start=1&count=50` | Template sheets. |
+| `/f/<folder id>` | One folder. Rename or delete it. |
+| `/s/S3F9A1C07-A` | One sheet (what the QR opens). Scan, rename, move to a folder, open/download PDF, delete. |
+| `/print` | Make a template PDF of fresh random-ID sheets. |
+| `/pdf/S3F9A1C07.pdf` | PDF of one sheet (side A then B). Add `?download=1` to download. |
+| `/pdf?ids=S3F9A1C07,S0012` | Several sheets in one PDF. |
+| `/template.pdf?count=50` | Template sheets. |
 
-Viewing and downloading are open. **Uploading, renaming and deleting need the upload
-key.** Open `http://67.217.63.103:8737/?key=YOUR_KEY` once on each device (phone, work
+Viewing and downloading are open. **Uploading, renaming, folders and deleting need the
+upload key.** Open `http://67.217.63.103:8737/?key=YOUR_KEY` once on each device (phone, work
 PC); it's saved as a cookie. Or just tap Scan and type it when asked.
 
 ## Deploy on the VPS
@@ -78,6 +90,7 @@ sudo cat /var/lib/notes/upload_key.txt   # your upload key
 ```
 
 Then visit `http://67.217.63.103:8737/?key=<that key>` on your phone and on your work PC.
+To add another device later, run `cat /var/lib/notes/upload_key.txt` on the VPS again.
 
 It runs on port **8737** so it doesn't clash with anything already on 80/443 (glub.chat).
 
@@ -108,7 +121,7 @@ home page, which reads the sheet number from the photo's QR).
 ```bash
 pip install -r requirements.txt
 uvicorn app.main:app --port 8737
-python -m app.template --start 1 --count 5 -o sheets.pdf   # template without the server
+python -m app.template --count 5 -o sheets.pdf   # template without the server
 ```
 
 ## Printing tips

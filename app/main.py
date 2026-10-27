@@ -16,7 +16,7 @@ from starlette.staticfiles import StaticFiles
 from . import config, storage
 from .layout import PAGE_RE, SHEET_RE, SIDES
 from .scan import ScanError, scan
-from .template import build_pdf as build_template
+from .template import build_pdf as build_template, new_ids
 
 STATIC = Path(__file__).parent / "static"
 COOKIE = "notes_key"
@@ -62,7 +62,6 @@ async def api_me(request: Request):
     return JSONResponse({
         "can_upload": _authorized(request),
         "base_url": config.BASE_URL,
-        "next_template_start": storage.next_template_start(),
     })
 
 
@@ -76,13 +75,14 @@ async def api_key(request: Request):
 
 
 async def api_sheets(request: Request):
-    return JSONResponse({"sheets": storage.list_sheets()})
+    return JSONResponse({"sheets": storage.list_sheets(), "folders": storage.list_folders()})
 
 
 async def api_sheet(request: Request):
     sid = request.path_params["sid"]
     if not storage.valid_id(sid):
         return _err("Not a sheet ID.", 404)
+    sid = sid.upper()
     if request.method == "GET":
         meta = storage.read_meta(sid)
         return JSONResponse({"sheet": meta}) if meta else JSONResponse({"sheet": None, "id": sid})
@@ -91,7 +91,8 @@ async def api_sheet(request: Request):
     try:
         if request.method == "PATCH":
             body = await request.json()
-            return JSONResponse({"sheet": storage.set_title(sid, str(body.get("title", "")))})
+            changes = {k: body[k] for k in ("title", "folder") if k in body}
+            return JSONResponse({"sheet": storage.update_sheet(sid, **changes)})
         if request.method == "DELETE":
             side = request.query_params.get("side")
             if side is not None and side not in SIDES:
@@ -99,6 +100,37 @@ async def api_sheet(request: Request):
             return JSONResponse({"sheet": storage.delete_sheet(sid, side)})
     except KeyError:
         return _err("No such sheet.", 404)
+    except LookupError as e:
+        return _err(str(e), 404)
+    return _err("Method not allowed.", 405)
+
+
+async def api_folders(request: Request):
+    if request.method == "GET":
+        return JSONResponse({"folders": storage.list_folders()})
+    if not _authorized(request):
+        return _need_key()
+    body = await request.json()
+    try:
+        return JSONResponse({"folder": storage.create_folder(body.get("name", ""))})
+    except ValueError as e:
+        return _err(str(e))
+
+
+async def api_folder(request: Request):
+    fid = request.path_params["fid"]
+    if not _authorized(request):
+        return _need_key()
+    try:
+        if request.method == "PATCH":
+            body = await request.json()
+            return JSONResponse({"folder": storage.rename_folder(fid, body.get("name", ""))})
+        if request.method == "DELETE":
+            return JSONResponse({"moved": storage.delete_folder(fid)})
+    except KeyError:
+        return _err("No such folder.", 404)
+    except ValueError as e:
+        return _err(str(e))
     return _err("Method not allowed.", 405)
 
 
@@ -108,7 +140,7 @@ async def api_upload(request: Request):
     limit = config.MAX_UPLOAD_MB * 1024 * 1024
     if int(request.headers.get("content-length") or 0) > limit + 64 * 1024:
         return _err(f"Photo is too big (max {config.MAX_UPLOAD_MB} MB).", 413)
-    form = await request.form(max_files=1, max_fields=4)
+    form = await request.form(max_files=1, max_fields=6)
     up = form.get("photo")
     if up is None or not hasattr(up, "read"):
         return _err("No photo in the upload.")
@@ -117,9 +149,10 @@ async def api_upload(request: Request):
     if len(data) > limit:
         return _err(f"Photo is too big (max {config.MAX_UPLOAD_MB} MB).", 413)
 
-    hint = str(form.get("sheet") or request.query_params.get("sheet") or "")
-    m = PAGE_RE.fullmatch(hint) or SHEET_RE.fullmatch(hint)
-    hint_id = m.group(1) if m and m.re is PAGE_RE else (m.group(0) if m else None)
+    hint = str(form.get("sheet") or "")
+    m = PAGE_RE.fullmatch(hint)
+    hint_id = m.group(1).upper() if m else (hint.upper() if SHEET_RE.fullmatch(hint) else None)
+    folder = str(form.get("folder") or "") or None
 
     try:
         result = await run_in_threadpool(scan, data)
@@ -141,7 +174,7 @@ async def api_upload(request: Request):
         if page.markers < 3:
             warnings.append(f"Side {side}: only {page.markers} of 3 corner markers found, so it may be slightly skewed.")
 
-    meta = await run_in_threadpool(storage.save_scan, sid, data, result)
+    meta = await run_in_threadpool(storage.save_scan, sid, data, result, folder)
     return JSONResponse({"sheet": meta, "saved_sides": sorted(result.pages), "warnings": warnings})
 
 
@@ -166,6 +199,7 @@ async def sheet_pdf(request: Request):
         sids = [s for s in request.query_params.get("ids", "").split(",") if s]
     if not sids or not all(storage.valid_id(s) for s in sids):
         return _err("Bad sheet list.", 400)
+    sids = [s.upper() for s in sids]
     try:
         pdf = await run_in_threadpool(storage.build_pdf, sids)
     except KeyError:
@@ -178,15 +212,14 @@ async def sheet_pdf(request: Request):
 
 async def template_pdf(request: Request):
     try:
-        start = int(request.query_params.get("start") or storage.next_template_start())
         count = int(request.query_params.get("count") or 50)
     except ValueError:
-        return _err("start and count must be numbers.")
-    if not (1 <= start <= 99999 and 1 <= count <= 500):
-        return _err("start must be 1-99999 and count 1-500.")
-    pdf = await run_in_threadpool(build_template, start, count)
-    storage.note_template_printed(start, count)
-    name = f"notes-sheets-{start:04d}-{start + count - 1:04d}.pdf"
+        return _err("count must be a number.")
+    if not 1 <= count <= 500:
+        return _err("count must be 1-500.")
+    ids = new_ids(count, storage.existing_ids())
+    pdf = await run_in_threadpool(build_template, ids)
+    name = f"notes-sheets-{count}.pdf"
     return Response(pdf, media_type="application/pdf",
                     headers={"Content-Disposition": f'inline; filename="{name}"'})
 
@@ -195,10 +228,13 @@ routes = [
     Route("/", spa),
     Route("/s/{page}", spa),
     Route("/print", spa),
+    Route("/f/{fid}", spa),
     Route("/api/me", api_me),
     Route("/api/key", api_key, methods=["POST"]),
     Route("/api/sheets", api_sheets),
     Route("/api/sheets/{sid}", api_sheet, methods=["GET", "PATCH", "DELETE"]),
+    Route("/api/folders", api_folders, methods=["GET", "POST"]),
+    Route("/api/folders/{fid}", api_folder, methods=["PATCH", "DELETE"]),
     Route("/api/upload", api_upload, methods=["POST"]),
     Route("/img/{sid}/{name}", page_image),
     Route("/pdf/{sid}.pdf", sheet_pdf),

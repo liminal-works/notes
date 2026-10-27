@@ -84,7 +84,7 @@ def _detect_qr(gray: np.ndarray) -> dict:
             for t in texts:
                 m = PAGE_RE.search(t or "")
                 if m:
-                    out.setdefault(m.group(2), m.group(1))
+                    out.setdefault(m.group(2).upper(), m.group(1).upper())
         if out:
             break
     return out

@@ -1,6 +1,8 @@
 """Printable bi-fold template: one landscape letter page per sheet.
 
-Run directly to write a PDF:  python -m app.template --start 1 --count 50 -o sheets.pdf
+Run directly to write a PDF:  python -m app.template --count 50 -o sheets.pdf
+
+Every sheet gets a fresh random ID, so there's no numbering to keep track of.
 """
 import argparse
 import io
@@ -14,7 +16,7 @@ from reportlab.pdfgen import canvas
 
 from . import config
 from .layout import (
-    ARUCO_DICT, FOLD_X, MARKER, MARKER_IDS, PAGE_H, PAGE_W, QR, marker_rect, page_url, qr_rect, sheet_id,
+    ARUCO_DICT, FOLD_X, MARKER, MARKER_IDS, PAGE_H, PAGE_W, QR, marker_rect, new_sheet_id, page_url, qr_rect,
 )
 
 _DICT = cv2.aruco.getPredefinedDictionary(ARUCO_DICT)
@@ -46,8 +48,7 @@ def _draw_qr(c: canvas.Canvas, data: str, x: float, y: float):
     renderPDF.draw(d, c, x, _rl_y(y, QR))
 
 
-def draw_sheet(c: canvas.Canvas, n: int, base_url: str):
-    sid = sheet_id(n)
+def draw_sheet(c: canvas.Canvas, sid: str, base_url: str):
     # fold line
     c.setStrokeColor(GREY)
     c.setLineWidth(0.6)
@@ -64,13 +65,23 @@ def draw_sheet(c: canvas.Canvas, n: int, base_url: str):
         c.drawRightString(qx + QR, _rl_y(qy + QR + 9, 0), f"{sid}-{side}")
 
 
-def build_pdf(start: int, count: int, base_url: str | None = None) -> bytes:
+def new_ids(count: int, taken=frozenset()) -> list[str]:
+    """`count` random sheet IDs, unique within the batch and not in `taken`."""
+    ids: list[str] = []
+    while len(ids) < count:
+        sid = new_sheet_id()
+        if sid not in taken and sid not in ids:
+            ids.append(sid)
+    return ids
+
+
+def build_pdf(ids: list[str], base_url: str | None = None) -> bytes:
     base_url = base_url or config.BASE_URL
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=(PAGE_W, PAGE_H))
-    c.setTitle(f"Notes sheets {sheet_id(start)}-{sheet_id(start + count - 1)}")
-    for n in range(start, start + count):
-        draw_sheet(c, n, base_url)
+    c.setTitle(f"Notes sheets ({len(ids)})")
+    for sid in ids:
+        draw_sheet(c, sid, base_url)
         c.showPage()
     c.save()
     return buf.getvalue()
@@ -78,10 +89,9 @@ def build_pdf(start: int, count: int, base_url: str | None = None) -> bytes:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--start", type=int, default=1)
     ap.add_argument("--count", type=int, default=50)
     ap.add_argument("-o", "--out", default="sheets.pdf")
     a = ap.parse_args()
     with open(a.out, "wb") as f:
-        f.write(build_pdf(a.start, a.count))
+        f.write(build_pdf(new_ids(a.count)))
     print(f"wrote {a.out}")

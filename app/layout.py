@@ -6,6 +6,7 @@ folded along the vertical centre line into two portrait halves, A (left) and
 B (right).
 """
 import re
+import secrets
 
 import cv2
 
@@ -30,12 +31,15 @@ MARKER_IDS = {
 }
 SIDES = ("A", "B")
 
-SHEET_RE = re.compile(r"S(\d{4,6})")
-PAGE_RE = re.compile(r"(S\d{4,6})-([AB])")
+# Sheet IDs are "S" + 4-8 hex digits. New sheets get 8 random hex digits
+# (about 4 billion possibilities). The first printed batch used S0001-S0050:
+# decimal digits are valid hex, so those IDs still match and keep working.
+SHEET_RE = re.compile(r"S[0-9A-F]{4,8}", re.I)
+PAGE_RE = re.compile(r"\b(S[0-9A-F]{4,8})-([AB])\b", re.I)
 
 
-def sheet_id(n: int) -> str:
-    return f"S{n:04d}"
+def new_sheet_id() -> str:
+    return "S" + secrets.token_hex(4).upper()
 
 
 def half_left(side: str) -> float:
