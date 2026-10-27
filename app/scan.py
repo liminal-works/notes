@@ -58,7 +58,7 @@ def load_image(data: bytes) -> np.ndarray:
         im = Image.open(io.BytesIO(data))
         im = ImageOps.exif_transpose(im).convert("RGB")
     except Exception as e:
-        raise ScanError(f"Couldn't read that image ({e.__class__.__name__}).")
+        raise ScanError(f"Image could not be read ({e.__class__.__name__}).")
     return cv2.cvtColor(np.asarray(im), cv2.COLOR_RGB2BGR)
 
 
@@ -102,7 +102,7 @@ def _warp(img: np.ndarray, side: str, markers: dict) -> np.ndarray:
         dst.extend(((x - cx) * k, (y - cy) * k) for x, y in marker_corners(side, corner))
     H, _ = cv2.findHomography(np.float32(src), np.float32(dst), cv2.RANSAC, 4.0)
     if H is None:
-        raise ScanError("Couldn't line up the corner markers.")
+        raise ScanError("Corner markers could not be aligned.")
     size = (round(cw * k), round(ch * k))
     flat = cv2.warpPerspective(img, H, size, flags=cv2.INTER_CUBIC,
                                borderMode=cv2.BORDER_CONSTANT, borderValue=(255, 255, 255))
@@ -153,8 +153,8 @@ def scan(data: bytes) -> ScanResult:
             result.pages[side] = Page(side, _hide_markers(clean(flat), side), flat, len(mine))
     if not result.pages:
         raise ScanError(
-            "Couldn't find the corner markers. Retake the photo with the whole half "
-            "in view, flat, in decent light."
+            "Corner markers not found. Retake the photo with the full page in view, "
+            "flat and well lit."
         )
     return result
 
@@ -162,7 +162,7 @@ def scan(data: bytes) -> ScanResult:
 def encode_jpeg(img: np.ndarray, quality: int = 85) -> bytes:
     ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, quality, cv2.IMWRITE_JPEG_OPTIMIZE, 1])
     if not ok:
-        raise ScanError("Couldn't encode the image.")
+        raise ScanError("Image could not be encoded.")
     return buf.tobytes()
 
 

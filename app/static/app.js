@@ -39,7 +39,7 @@ async function api(path, opts = {}) {
 
 async function ensureKey() {
   if (me.can_upload) return true;
-  const key = window.prompt("Enter your upload key (you only need to do this once on this device):");
+  const key = window.prompt("Enter the upload key. It will be saved on this device.");
   if (!key) return false;
   try {
     await api("/api/key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key }) });
@@ -114,7 +114,7 @@ async function upload(file, sheetHint, statusEl, folderId) {
         return null;
       }
       // no answer at all: bad signal or timeout. Keep the photo and offer a retry.
-      statusEl.innerHTML = `<div class="notice err">Upload didn't go through (weak signal?). The photo is kept.
+      statusEl.innerHTML = `<div class="notice err">Upload failed. Check the connection and try again. The photo has been kept.
         <div class="row" style="margin-top:8px"><button class="btn primary" data-a="retry">Try again</button>
         <button class="btn" data-a="cancel">Cancel</button></div></div>`;
       const again = await new Promise((ok) => {
@@ -144,7 +144,7 @@ async function newFolder() {
   if (!name || !name.trim()) return null;
   try {
     const { folder } = await api("/api/folders", jsonOpts("POST", { name }));
-    toast(`Made “${folder.name}”`);
+    toast(`Folder “${folder.name}” created`);
     return folder;
   } catch (e) { toast(e.message); return null; }
 }
@@ -173,7 +173,7 @@ async function browseView(folderId) {
 
   let folder = folderId ? folders.find((f) => f.id === folderId) : null;
   if (folderId && !folder) {
-    $view.innerHTML = `<div class="empty">That folder doesn't exist anymore. <a href="/">All notes</a></div>`;
+    $view.innerHTML = `<div class="empty">Folder not found. <a href="/">All notes</a></div>`;
     return;
   }
 
@@ -223,9 +223,9 @@ async function browseView(folderId) {
     if (!folder && !q && folders.length) html += `<h2 class="section">Not in a folder</h2>`;
 
     if (!sheets.length && !folder) {
-      html += `<div class="empty">No notes yet.<br>Print some sheets, write on one, then scan its QR code with your phone camera.</div>`;
+      html += `<div class="empty">No notes yet.<br>Print sheets, then scan a sheet's QR code to upload it.</div>`;
     } else if (!shown.length) {
-      html += `<div class="empty">${q ? `Nothing matches “${esc(q)}”.` : folder ? "This folder is empty. Use Select on the main page to move notes here, or scan a sheet from here." : "Everything is in a folder."}</div>`;
+      html += `<div class="empty">${q ? `Nothing matches “${esc(q)}”.` : folder ? "This folder is empty. Move notes here with Select on the main page, or scan a sheet from this folder." : "All notes are in folders."}</div>`;
     } else {
       html += `<div class="grid">${shown.map((s) => cardHtml(s, { ...opts, folderName: !folder && q ? nameOf(s.folder) : null })).join("")}</div>`;
     }
@@ -305,7 +305,7 @@ async function browseView(folderId) {
     const $d = document.getElementById("fdel");
     if ($d) $d.onclick = async () => {
       const n = sheets.filter((s) => s.folder === folder.id).length;
-      if (!confirm(`Delete the folder “${folder.name}”?${n ? ` Its ${n} note${n === 1 ? "" : "s"} won't be deleted; they go back to the main page.` : ""}`)) return;
+      if (!confirm(`Delete folder “${folder.name}”?${n ? ` The ${n} note${n === 1 ? "" : "s"} in it will not be deleted and will move to the main page.` : ""}`)) return;
       try { await api(`/api/folders/${folder.id}`, { method: "DELETE" }); location.href = "/"; }
       catch (e) { toast(e.message); }
     };
@@ -317,7 +317,7 @@ async function browseView(folderId) {
 // ---------- one sheet ----------
 async function sheetView(page) {
   const m = /^(S[0-9A-F]{4,8})(?:-([AB]))?$/i.exec(page);
-  if (!m) { $view.innerHTML = `<div class="empty">That isn't a sheet link.</div>`; return; }
+  if (!m) { $view.innerHTML = `<div class="empty">Invalid sheet link.</div>`; return; }
   const sid = m[1].toUpperCase(), qrSide = m[2] ? m[2].toUpperCase() : null;
   let sheet = null, folders = [];
 
@@ -376,13 +376,13 @@ async function sheetView(page) {
       }
       try {
         sheet = (await api(`/api/sheets/${sid}`, jsonOpts("PATCH", { folder: fid || null }))).sheet;
-        toast(fid ? `Moved to “${folders.find((x) => x.id === fid).name}”` : "Taken out of the folder");
+        toast(fid ? `Moved to “${folders.find((x) => x.id === fid).name}”` : "Removed from folder");
       } catch (e) { toast(e.message); }
       render();
     };
     const $del = document.getElementById("del");
     if ($del) $del.onclick = async () => {
-      if (!confirm("Delete this note and its scans? This can't be undone.")) return;
+      if (!confirm("Delete this note and all of its scans? This cannot be undone.")) return;
       try { await api(`/api/sheets/${sid}`, { method: "DELETE" }); location.href = cur ? `/f/${cur.id}` : "/"; }
       catch (e) { toast(e.message); }
     };
@@ -399,21 +399,22 @@ async function sheetView(page) {
 function printView() {
   $view.innerHTML = `
     <h1>Print sheets</h1>
-    <p class="sub">Every sheet gets its own random ID, so print as many as you like, whenever you like.</p>
+    <p class="sub">Each sheet is assigned a unique random ID.</p>
     <div class="form">
-      <label for="count">How many sheets</label>
+      <label for="count">Number of sheets</label>
       <input id="count" type="number" min="1" max="500" value="50">
-      <button class="btn primary big" id="go">Make PDF</button>
+      <button class="btn primary big" id="go">Generate PDF</button>
     </div>
+    <h2 class="section">Printing guidelines</h2>
     <ul class="tips">
-      <li>Print at <b>Actual size / 100%</b>, landscape, one-sided. “Fit to page” shrinks the markers a little; it still works, but actual size is best.</li>
-      <li>Load the scrap paper so the template lands on the blank side.</li>
-      <li>Fold on the dotted line. Each half is its own page with its own QR code.</li>
-      <li>Your older numbered sheets (S0001 and up) keep working.</li>
+      <li>Print at <b>100% (actual size)</b>, landscape, single-sided.</li>
+      <li>Load the paper so the template prints on the blank side.</li>
+      <li>Fold along the dotted line. Each half is a separate page with its own QR code.</li>
+      <li>Sheets with legacy numeric IDs (S0001–S0050) remain supported.</li>
     </ul>`;
   document.getElementById("go").onclick = () => {
     const c = +document.getElementById("count").value;
-    if (!(c >= 1 && c <= 500)) { toast("Pick between 1 and 500"); return; }
+    if (!(c >= 1 && c <= 500)) { toast("Enter a number from 1 to 500"); return; }
     window.open(`/template.pdf?count=${c}`, "_blank");
   };
 }

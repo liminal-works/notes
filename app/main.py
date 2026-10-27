@@ -38,7 +38,7 @@ def _err(msg: str, status: int = 400):
 
 
 def _need_key():
-    return _err("This needs your upload key.", 401)
+    return _err("Upload key required.", 401)
 
 
 # --- pages --------------------------------------------------------------------
@@ -68,7 +68,7 @@ async def api_me(request: Request):
 async def api_key(request: Request):
     body = await request.json()
     if not secrets.compare_digest(str(body.get("key", "")).strip().encode(), KEY.encode()):
-        return _err("That key isn't right.", 403)
+        return _err("Invalid upload key.", 403)
     resp = JSONResponse({"ok": True})
     _set_key_cookie(resp)
     return resp
@@ -99,7 +99,7 @@ async def api_sheet(request: Request):
                 return _err("Bad side.")
             return JSONResponse({"sheet": storage.delete_sheet(sid, side)})
     except KeyError:
-        return _err("No such sheet.", 404)
+        return _err("Sheet not found.", 404)
     except LookupError as e:
         return _err(str(e), 404)
     return _err("Method not allowed.", 405)
@@ -128,7 +128,7 @@ async def api_folder(request: Request):
         if request.method == "DELETE":
             return JSONResponse({"moved": storage.delete_folder(fid)})
     except KeyError:
-        return _err("No such folder.", 404)
+        return _err("Folder not found.", 404)
     except ValueError as e:
         return _err(str(e))
     return _err("Method not allowed.", 405)
@@ -139,7 +139,7 @@ async def api_upload(request: Request):
         return _need_key()
     limit = config.MAX_UPLOAD_MB * 1024 * 1024
     if int(request.headers.get("content-length") or 0) > limit + 64 * 1024:
-        return _err(f"Photo is too big (max {config.MAX_UPLOAD_MB} MB).", 413)
+        return _err(f"Photo exceeds the {config.MAX_UPLOAD_MB} MB limit.", 413)
     form = await request.form(max_files=1, max_fields=6)
     up = form.get("photo")
     if up is None or not hasattr(up, "read"):
@@ -147,7 +147,7 @@ async def api_upload(request: Request):
     data = await up.read()
     await form.close()
     if len(data) > limit:
-        return _err(f"Photo is too big (max {config.MAX_UPLOAD_MB} MB).", 413)
+        return _err(f"Photo exceeds the {config.MAX_UPLOAD_MB} MB limit.", 413)
 
     hint = str(form.get("sheet") or "")
     m = PAGE_RE.fullmatch(hint)
@@ -163,16 +163,16 @@ async def api_upload(request: Request):
     warnings = []
     qr = set(result.qr_ids.values())
     if len(qr) > 1:
-        return _err("Two different sheets are in this photo. Take one at a time.", 422)
+        return _err("This photo contains two different sheets. Photograph one sheet at a time.", 422)
     sid = next(iter(qr), None) or hint_id
     if sid is None:
         await run_in_threadpool(storage.save_unmatched, data)
-        return _err("Couldn't read the QR code. Scan the sheet's QR with your camera and upload from that page.", 422)
+        return _err("QR code could not be read. Scan the sheet's QR code with the camera and upload from that page.", 422)
     if hint_id and sid != hint_id:
-        warnings.append(f"The photo's QR says {sid}, not {hint_id}; saved as {sid}.")
+        warnings.append(f"QR code reads {sid}, not {hint_id}. Saved as {sid}.")
     for side, page in result.pages.items():
         if page.markers < 3:
-            warnings.append(f"Side {side}: only {page.markers} of 3 corner markers found, so it may be slightly skewed.")
+            warnings.append(f"Side {side}: {page.markers} of 3 corner markers found. The page may be slightly skewed.")
 
     meta = await run_in_threadpool(storage.save_scan, sid, data, result, folder)
     return JSONResponse({"sheet": meta, "saved_sides": sorted(result.pages), "warnings": warnings})
@@ -203,7 +203,7 @@ async def sheet_pdf(request: Request):
     try:
         pdf = await run_in_threadpool(storage.build_pdf, sids)
     except KeyError:
-        return _err("Nothing scanned for those sheets yet.", 404)
+        return _err("No scanned pages for the selected sheets.", 404)
     name = sids[0] if len(sids) == 1 else f"notes-{len(sids)}-sheets"
     disp = "attachment" if request.query_params.get("download") else "inline"
     return Response(pdf, media_type="application/pdf",

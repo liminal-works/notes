@@ -133,7 +133,7 @@ def update_sheet(sid: str, title=_UNSET, folder=_UNSET) -> dict:
             meta["title"] = str(title or "").strip()[:200]
         if folder is not _UNSET:
             if folder and not get_folder(folder):
-                raise LookupError("No such folder.")
+                raise LookupError("Folder not found.")
             meta["folder"] = folder or None
         _write_meta(sid, meta)
     return meta
@@ -202,9 +202,9 @@ def get_folder(fid: str) -> dict | None:
 def _clean_name(name: str, folders: list[dict], skip: str | None = None) -> str:
     name = " ".join(str(name or "").split())[:FOLDER_NAME_MAX]
     if not name:
-        raise ValueError("Give the folder a name.")
+        raise ValueError("Folder name is required.")
     if any(f["name"].lower() == name.lower() and f["id"] != skip for f in folders):
-        raise ValueError(f"There's already a folder called “{name}”.")
+        raise ValueError(f"A folder named “{name}” already exists.")
     return name
 
 
