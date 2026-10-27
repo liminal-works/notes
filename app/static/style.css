@@ -36,7 +36,7 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 a { color: inherit; }
-button, input { font: inherit; color: inherit; }
+button, input, select { font: inherit; color: inherit; }
 
 .top {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -65,10 +65,21 @@ h1 { font-size: 22px; margin: 4px 0 2px; letter-spacing: -.01em; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .spacer { flex: 1; }
 
-.toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+/* Rows of equal-width buttons that fill the line. Set --n to the number of buttons. */
+.btn-row { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 8px; }
+.btn-row > .btn, .btn-row > input { width: 100%; min-width: 0; }
+.btn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Search on its own full-width line, buttons below (phones);
+   search and buttons share one line on wider screens. */
+.toolbar { display: grid; gap: 8px; margin-bottom: 14px; }
 .toolbar input[type=search] {
-  flex: 1 1 220px; min-width: 0; padding: 9px 12px; border-radius: 10px;
+  width: 100%; min-width: 0; min-height: 42px; padding: 9px 12px; border-radius: 10px;
   border: 1px solid var(--line); background: var(--surface);
+}
+@media (min-width: 760px) {
+  .toolbar { grid-template-columns: minmax(0, 1fr) auto; }
+  .toolbar .btn-row { grid-template-columns: repeat(var(--n, 2), 140px); }
 }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
@@ -106,10 +117,13 @@ h1 { font-size: 22px; margin: 4px 0 2px; letter-spacing: -.01em; }
 .spin { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(1turn); } }
 
-.form { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; max-width: 520px; box-shadow: var(--shadow); }
-.form label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 4px; }
-.form input { width: 100%; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); margin-bottom: 12px; }
-.tips { color: var(--muted); font-size: 14px; padding-left: 18px; }
+.narrow { max-width: 640px; margin: 0 auto; }
+.form { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
+.form label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+.form input { width: 100%; min-height: 42px; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); }
+.form .section { margin-top: 20px; }
+.tips { color: var(--muted); font-size: 14px; padding-left: 18px; margin: 0; }
+.tips li + li { margin-top: 4px; }
 
 #toast {
   position: fixed; left: 50%; bottom: max(18px, env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px);
@@ -134,9 +148,23 @@ h1 { font-size: 22px; margin: 4px 0 2px; letter-spacing: -.01em; }
 .crumb:hover { color: var(--ink); }
 .folder-head { flex-wrap: nowrap; margin-bottom: 12px; }
 .folder-head .title-input { flex: 1; min-width: 0; }
-.selbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
-.selbar .sub { margin: 0; }
-select.btn { appearance: none; -webkit-appearance: none; padding-right: 30px;
+.selbar { display: grid; gap: 8px; margin-bottom: 14px; }
+.selcount { color: var(--muted); font-size: 14px; }
+@media (min-width: 760px) {
+  .selbar { grid-template-columns: 1fr auto; align-items: center; }
+  .selbar .btn-row { grid-template-columns: repeat(var(--n, 3), 160px); }
+}
+
+/* Note page actions: folder menu on its own line, then equal buttons (phones);
+   all on one line on wider screens. */
+.sheet-actions { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.sheet-actions > * { width: 100%; min-width: 0; }
+.sheet-actions > select { grid-column: 1 / -1; }
+@media (min-width: 760px) {
+  .sheet-actions { grid-template-columns: minmax(0, 2fr) repeat(var(--n, 3), minmax(0, 1fr)); }
+  .sheet-actions > select { grid-column: auto; }
+}
+select.btn { appearance: none; -webkit-appearance: none; padding-left: 12px; padding-right: 28px; text-align: left; justify-content: flex-start;
   background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
   background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
 .card.picked { outline: 2px solid var(--accent); outline-offset: -1px; }

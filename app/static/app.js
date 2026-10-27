@@ -186,15 +186,19 @@ async function browseView(folderId) {
       </div>` : ""}
     <div class="toolbar">
       <input type="search" id="q" placeholder="${folder ? "Search this folder" : "Search all notes"}" autocomplete="off">
-      <button class="btn" id="selbtn">Select</button>
-      ${folder ? "" : `<button class="btn" id="newf">New folder</button>`}
-      <button class="btn primary" id="scan">Scan a sheet</button>
+      <div class="btn-row" style="--n:${folder ? 2 : 3}">
+        <button class="btn" id="selbtn">Select</button>
+        ${folder ? "" : `<button class="btn" id="newf">New folder</button>`}
+        <button class="btn primary" id="scan">Scan a sheet</button>
+      </div>
     </div>
     <div class="selbar" id="selbar" hidden>
-      <span id="selcount" class="sub">0 selected</span><span class="spacer"></span>
-      <select class="btn" id="selmove" aria-label="Move selected notes"></select>
-      <a class="btn" id="selopen" target="_blank">Open PDF</a>
-      <a class="btn primary" id="seldl">Download PDF</a>
+      <div id="selcount" class="selcount">0 selected</div>
+      <div class="btn-row" style="--n:3">
+        <select class="btn" id="selmove" aria-label="Move selected notes"></select>
+        <a class="btn" id="selopen" target="_blank">Open PDF</a>
+        <a class="btn primary" id="seldl">Download</a>
+      </div>
     </div>
     <div id="scanstatus"></div>
     <div id="list"></div>`;
@@ -243,7 +247,7 @@ async function browseView(folderId) {
     }
     const mv = document.getElementById("selmove");
     mv.disabled = !picked.size;
-    mv.innerHTML = `<option value="" disabled selected>Move to…</option>`
+    mv.innerHTML = `<option value="" disabled selected>Move to</option>`
       + folders.filter((f) => f.id !== folder?.id).map((f) => `<option value="${f.id}">${esc(f.name)}</option>`).join("")
       + `<option value="__new">New folder…</option>`
       + (folder ? `<option value="__none">Out of this folder</option>` : "");
@@ -339,15 +343,14 @@ async function sheetView(page) {
       <p class="sub">${sid}${sheet ? ` · uploaded ${when(sheet.uploaded)}` : " · nothing scanned yet"}</p>
       <button class="btn primary big" id="scan">${qrSide ? `Scan side ${qrSide}` : "Scan this sheet"}</button>
       <div id="scanstatus"></div>
-      ${hasPages ? `<div class="row" style="margin-top:12px">
+      ${hasPages ? `<div class="sheet-actions" style="--n:${me.can_upload ? 3 : 2}">
         <select class="btn" id="folder" aria-label="Folder" ${me.can_upload ? "" : "disabled"}>
           <option value="">No folder</option>
           ${folders.map((f) => `<option value="${f.id}" ${f.id === sheet.folder ? "selected" : ""}>${esc(f.name)}</option>`).join("")}
           <option value="__new">New folder…</option>
         </select>
         <a class="btn" href="/pdf/${sid}.pdf?v=${v}" target="_blank">Open PDF</a>
-        <a class="btn" href="/pdf/${sid}.pdf?download=1&v=${v}">Download PDF</a>
-        <span class="spacer"></span>
+        <a class="btn" href="/pdf/${sid}.pdf?download=1&v=${v}">Download</a>
         ${me.can_upload ? `<button class="btn danger" id="del">Delete</button>` : ""}
       </div>` : ""}
       <div class="pages">${pageHtml("A")}${pageHtml("B")}</div>`;
@@ -398,20 +401,22 @@ async function sheetView(page) {
 // ---------- print ----------
 function printView() {
   $view.innerHTML = `
-    <h1>Print sheets</h1>
-    <p class="sub">Each sheet is assigned a unique random ID.</p>
-    <div class="form">
-      <label for="count">Number of sheets</label>
-      <input id="count" type="number" min="1" max="500" value="50">
-      <button class="btn primary big" id="go">Generate PDF</button>
-    </div>
-    <h2 class="section">Printing guidelines</h2>
-    <ul class="tips">
-      <li>Print at <b>100% (actual size)</b>, landscape, single-sided.</li>
-      <li>Load the paper so the template prints on the blank side.</li>
-      <li>Fold along the dotted line. Each half is a separate page with its own QR code.</li>
-      <li>Sheets with legacy numeric IDs (S0001–S0050) remain supported.</li>
-    </ul>`;
+    <div class="narrow">
+      <h1>Print sheets</h1>
+      <p class="sub">Each sheet is assigned a unique random ID.</p>
+      <div class="form">
+        <label for="count">Number of sheets</label>
+        <div class="btn-row" style="--n:2">
+          <input id="count" type="number" inputmode="numeric" min="1" max="500" value="50">
+          <button class="btn primary" id="go">Generate PDF</button>
+        </div>
+        <h2 class="section">Printing guidelines</h2>
+        <ul class="tips">
+          <li>Print at <b>100% (actual size)</b>, landscape, single-sided.</li>
+          <li>Fold along the dotted line. Each half is a separate page with its own QR code.</li>
+        </ul>
+      </div>
+    </div>`;
   document.getElementById("go").onclick = () => {
     const c = +document.getElementById("count").value;
     if (!(c >= 1 && c <= 500)) { toast("Enter a number from 1 to 500"); return; }
