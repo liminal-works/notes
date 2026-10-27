@@ -7,6 +7,36 @@ on it, then scan the QR code with your phone. The app straightens and cleans the
 photo and keeps each sheet as images plus a PDF you can open or download from any
 browser.
 
+## Where it lives (production)
+
+| What | Where |
+|---|---|
+| Web app | `http://67.217.63.103:8737` (same VPS as glub.chat) |
+| Code | `/opt/notes` on the VPS (a clone of this repo) |
+| Notes data | `/var/lib/notes` (sheets, folders, uploaded photos) |
+| Upload key | `/var/lib/notes/upload_key.txt` |
+| Service | systemd unit `notes` (`/etc/systemd/system/notes.service`) |
+
+**Deploy an update** (run on the VPS as root):
+
+```bash
+cd /opt/notes && git pull && systemctl restart notes
+```
+
+Other useful commands:
+
+```bash
+systemctl status notes                # is it running?
+journalctl -u notes -n 50 --no-pager  # recent logs / errors
+cat /var/lib/notes/upload_key.txt     # key for adding a new device
+```
+
+If `requirements.txt` changed, also run `/opt/notes/.venv/bin/pip install -r /opt/notes/requirements.txt`
+before restarting. If `deploy/notes.service` changed, copy it to `/etc/systemd/system/` and run
+`systemctl daemon-reload` first.
+
+Back up `/var/lib/notes` to keep every note. The code can always be re-cloned.
+
 ## How it works
 
 **The sheet.** Letter, landscape, folded on the dotted line into two halves, **A**
