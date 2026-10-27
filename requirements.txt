@@ -1,0 +1,9 @@
+starlette>=0.37
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+opencv-python-headless>=4.8
+numpy>=1.24
+pillow>=10
+pillow-heif>=0.16
+reportlab>=4.0
+img2pdf>=0.5

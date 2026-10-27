@@ -1,0 +1,20 @@
+[Unit]
+Description=Notes scanner web app
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/opt/notes
+ExecStart=/opt/notes/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8737
+# Upload key: by default the app generates one on first start and saves it in
+# /var/lib/notes/upload_key.txt. To pick your own instead, uncomment:
+#Environment=NOTES_UPLOAD_KEY=some-long-random-string
+Environment=NOTES_BASE_URL=http://67.217.63.103:8737
+Environment=NOTES_DATA_DIR=/var/lib/notes
+# systemd creates /var/lib/notes for a throwaway service user; notes live there.
+DynamicUser=yes
+StateDirectory=notes
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
