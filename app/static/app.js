@@ -60,22 +60,70 @@ function pickPhoto() {
   });
 }
 
-async function upload(file, sheetHint, statusEl) {
-  const fd = new FormData();
-  fd.append("photo", file);
-  if (sheetHint) fd.append("sheet", sheetHint);
-  statusEl.innerHTML = `<div class="busy"><div class="spin"></div>Uploading and straightening…</div>`;
+// Phone photos are 3-6 MB. Shrink to SHRINK_MAX px on the long side before upload
+// (~150-400 KB); the corner markers and QR still read fine at this size.
+const SHRINK_MAX = 1600;
+const SHRINK_QUALITY = 0.8;
+
+async function shrink(file) {
   try {
-    const res = await api("/api/upload", { method: "POST", body: fd });
-    statusEl.innerHTML = res.warnings.length
-      ? res.warnings.map((w) => `<div class="notice">${esc(w)}</div>`).join("")
-      : "";
-    toast(`Saved side ${res.saved_sides.join(" + ")}`);
-    return res;
-  } catch (e) {
-    if (e.status === 401) me.can_upload = false;
-    statusEl.innerHTML = `<div class="notice err">${esc(e.message)}</div>`;
-    return null;
+    const url = URL.createObjectURL(file);
+    const img = await new Promise((ok, bad) => {
+      const i = new Image();
+      i.onload = () => ok(i);
+      i.onerror = bad;
+      i.src = url;
+    });
+    URL.revokeObjectURL(url);
+    const k = Math.min(1, SHRINK_MAX / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.naturalWidth * k);
+    c.height = Math.round(img.naturalHeight * k);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    const blob = await new Promise((ok) => c.toBlob(ok, "image/jpeg", SHRINK_QUALITY));
+    return blob && blob.size < file.size ? blob : file;
+  } catch {
+    return file; // couldn't decode in the browser (e.g. HEIC on desktop); send as-is
+  }
+}
+
+const kb = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+
+async function upload(file, sheetHint, statusEl) {
+  statusEl.innerHTML = `<div class="busy"><div class="spin"></div>Shrinking photo…</div>`;
+  const photo = await shrink(file);
+  for (;;) {
+    const fd = new FormData();
+    fd.append("photo", photo, "photo.jpg");
+    if (sheetHint) fd.append("sheet", sheetHint);
+    statusEl.innerHTML = `<div class="busy"><div class="spin"></div>Uploading ${kb(photo.size)} and straightening…</div>`;
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 90000);
+    try {
+      const res = await api("/api/upload", { method: "POST", body: fd, signal: ctl.signal });
+      statusEl.innerHTML = res.warnings.length
+        ? res.warnings.map((w) => `<div class="notice">${esc(w)}</div>`).join("")
+        : "";
+      toast(`Saved side ${res.saved_sides.join(" + ")}`);
+      return res;
+    } catch (e) {
+      if (e.status === 401) me.can_upload = false;
+      if (e.status) { // the server answered with an error; retrying won't help
+        statusEl.innerHTML = `<div class="notice err">${esc(e.message)}</div>`;
+        return null;
+      }
+      // no answer at all: bad signal or timeout. Keep the photo and offer a retry.
+      statusEl.innerHTML = `<div class="notice err">Upload didn't go through (weak signal?). The photo is kept.
+        <div class="row" style="margin-top:8px"><button class="btn primary" data-a="retry">Try again</button>
+        <button class="btn" data-a="cancel">Cancel</button></div></div>`;
+      const again = await new Promise((ok) => {
+        statusEl.querySelector('[data-a="retry"]').onclick = () => ok(true);
+        statusEl.querySelector('[data-a="cancel"]').onclick = () => ok(false);
+      });
+      if (!again) { statusEl.innerHTML = ""; return null; }
+    } finally {
+      clearTimeout(timer);
+    }
   }
 }
 
