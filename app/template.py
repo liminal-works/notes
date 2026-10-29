@@ -16,11 +16,12 @@ from reportlab.pdfgen import canvas
 
 from . import config
 from .layout import (
-    ARUCO_DICT, FOLD_X, MARKER, MARKER_IDS, PAGE_H, PAGE_W, QR, marker_rect, new_sheet_id, page_url, qr_rect,
+    ARUCO_DICT, FOLD_X, MARKER, MARKER_IDS, PAGE_H, PAGE_W, QR, marker_rect, new_sheet_id, page_url, qr_rect, rule_lines,
 )
 
 _DICT = cv2.aruco.getPredefinedDictionary(ARUCO_DICT)
 GREY = Color(0.6, 0.6, 0.6)
+RULE = Color(0.72, 0.72, 0.72)  # light enough that the scan cleanup fades it
 
 
 def _rl_y(y: float, h: float) -> float:
@@ -57,6 +58,11 @@ def draw_sheet(c: canvas.Canvas, sid: str, base_url: str):
     c.setDash()
     for mid, (side, corner) in MARKER_IDS.items():
         _draw_marker(c, mid, *marker_rect(side, corner))
+    c.setStrokeColor(RULE)
+    c.setLineWidth(0.5)
+    for side in ("A", "B"):
+        for x0, x1, y in rule_lines(side):
+            c.line(x0, _rl_y(y, 0), x1, _rl_y(y, 0))
     for side in ("A", "B"):
         qx, qy = qr_rect(side)
         _draw_qr(c, page_url(base_url, sid, side), qx, qy)

@@ -45,6 +45,8 @@ Back up `/var/lib/notes` to keep every note. The code can always be re-cloned.
 - a QR code (top-right) holding a link like `http://67.217.63.103:8737/s/S3F9A1C07-A`
 - three small square markers (ArUco) in the other corners, used to straighten the photo
 - a small grey label `S3F9A1C07-A` with the sheet ID
+- light ruled lines on the top half (college-ruled spacing); the bottom half is left blank
+  for sketches or graphs. The scan cleanup fades the lines, so saved pages show just the writing.
 
 **Sheet IDs** are `S` + random hex (8 digits on new sheets, about 4 billion
 possibilities), so there's no numbering to keep in order; print a batch whenever.

@@ -21,6 +21,11 @@ MARKER = 0.45 * INCH        # ArUco marker size
 QR = 0.80 * INCH            # QR size (~2 cm)
 CROP_INSET = 0.12 * INCH    # trim when cropping, so printer offset never shows the table under the paper
 
+# Ruled lines on the top half of each page (college-ruled spacing); the bottom half stays blank.
+RULE_SPACING = 9 / 32 * INCH
+RULE_TOP = MARGIN + QR + 0.30 * INCH   # first line sits below the QR code and its label
+RULE_BOTTOM = PAGE_H / 2               # last line at the middle of the page
+
 ARUCO_DICT = cv2.aruco.DICT_4X4_50
 
 # Each half has its QR in the top-right corner and ArUco markers in the other three.
@@ -73,3 +78,11 @@ def crop_box(side: str):
 
 def page_url(base_url: str, sid: str, side: str) -> str:
     return f"{base_url}/s/{sid}-{side}"
+
+
+def rule_lines(side: str):
+    """Ruled lines for a half as (x0, x1, y) tuples, in sheet coordinates."""
+    x0 = half_left(side) + MARGIN
+    x1 = half_left(side) + HALF_W - MARGIN
+    n = int((RULE_BOTTOM - RULE_TOP) // RULE_SPACING) + 1
+    return [(x0, x1, RULE_TOP + k * RULE_SPACING) for k in range(n)]
