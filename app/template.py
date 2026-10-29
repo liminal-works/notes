@@ -17,11 +17,14 @@ from reportlab.pdfgen import canvas
 from . import config
 from .layout import (
     ARUCO_DICT, FOLD_X, MARKER, MARKER_IDS, PAGE_H, PAGE_W, QR, marker_rect, new_sheet_id, page_url, qr_rect, rule_lines,
+    CIRCLE_R, circle_centres, dot_grid, title_line,
 )
 
 _DICT = cv2.aruco.getPredefinedDictionary(ARUCO_DICT)
 GREY = Color(0.6, 0.6, 0.6)
 RULE = Color(0.72, 0.72, 0.72)  # light enough that the scan cleanup fades it
+CIRCLE = Color(0.45, 0.45, 0.45)
+CIRCLE_NUM = Color(0.62, 0.62, 0.62)  # bold but faint, so it never reads as a filled-in circle
 
 
 def _rl_y(y: float, h: float) -> float:
@@ -49,6 +52,24 @@ def _draw_qr(c: canvas.Canvas, data: str, x: float, y: float):
     renderPDF.draw(d, c, x, _rl_y(y, QR))
 
 
+def _draw_circles(c: canvas.Canvas, side: str):
+    """Folder circles 01-05, with small condensed bold numbers inside."""
+    size, squeeze = 4.3, 84
+    for i, (x, y) in enumerate(circle_centres(side), 1):
+        c.setStrokeColor(CIRCLE)
+        c.setLineWidth(0.6)
+        c.circle(x, _rl_y(y, 0), CIRCLE_R, stroke=1, fill=0)
+        label = f"{i:02d}"
+        w = c.stringWidth(label, "Helvetica-Bold", size) * squeeze / 100
+        t = c.beginText()
+        t.setFont("Helvetica-Bold", size)
+        t.setHorizScale(squeeze)
+        t.setFillColor(CIRCLE_NUM)
+        t.setTextOrigin(x - w / 2, _rl_y(y + 0.021 * 72, 0))
+        t.textOut(label)
+        c.drawText(t)
+
+
 def draw_sheet(c: canvas.Canvas, sid: str, base_url: str):
     # fold line
     c.setStrokeColor(GREY)
@@ -61,8 +82,12 @@ def draw_sheet(c: canvas.Canvas, sid: str, base_url: str):
     c.setStrokeColor(RULE)
     c.setLineWidth(0.5)
     for side in ("A", "B"):
-        for x0, x1, y in rule_lines(side):
+        for x0, x1, y in rule_lines(side) + [title_line(side)]:
             c.line(x0, _rl_y(y, 0), x1, _rl_y(y, 0))
+        c.setFillColor(RULE)
+        for x, y in dot_grid(side):
+            c.circle(x, _rl_y(y, 0), 0.45, stroke=0, fill=1)
+        _draw_circles(c, side)
     for side in ("A", "B"):
         qx, qy = qr_rect(side)
         _draw_qr(c, page_url(base_url, sid, side), qx, qy)

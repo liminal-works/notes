@@ -45,8 +45,10 @@ Back up `/var/lib/notes` to keep every note. The code can always be re-cloned.
 - a QR code (top-right) holding a link like `http://67.217.63.103:8737/s/S3F9A1C07-A`
 - three small square markers (ArUco) in the other corners, used to straighten the photo
 - a small grey label `S3F9A1C07-A` with the sheet ID
-- light ruled lines (college-ruled spacing): page A is ruled on the top half only, leaving the
-  bottom half blank for sketches or graphs; page B is ruled down the whole page. The scan cleanup fades the lines, so saved pages show just the writing.
+- a plain title line between the corner marker and the QR code
+- light ruled lines (college-ruled spacing): page A is ruled on the top half, with a faint
+  dot grid below for sketches or graphs; page B is ruled down the whole page
+- on page A, five folder circles `01`–`05` along the bottom edge (see Folders below)
 
 **Sheet IDs** are `S` + random hex (8 digits on new sheets, about 4 billion
 possibilities), so there's no numbering to keep in order; print a batch whenever.
@@ -61,6 +63,13 @@ from a note's folder menu, or tap **Select** on the main page, pick several and 
 **Move to…**. Notes not in a folder show on the main page. Searching from the main
 page searches everything. Scanning from inside a folder files the note there.
 Deleting a folder keeps its notes; they go back to the main page.
+
+**Folder circles.** A folder can be linked to one of the circles `01`–`05` printed at the
+bottom of page A (open the folder, pick the circle). Fill in that circle on the paper (a
+filled dot, X or tick all work) and the scan is filed into that folder automatically. Two
+filled circles, or a circle with no folder linked, files nothing and shows a notice. Only
+sheets printed from the app after this feature was added are checked for circles (their IDs
+are kept in `circle_sheets.json`); older sheets are never read for them.
 
 **Scanning.** Point the iPhone camera at a half's QR code. It opens that sheet's page;
 tap **Scan side A**, take the photo, done. You can photograph one half or the whole
@@ -82,7 +91,8 @@ data/
     A.thumb.jpg
     originals/       every photo you uploaded
   unmatched/         photos where no markers were found
-  folders.json       folder names
+  folders.json       folder names and linked circles
+  circle_sheets.json IDs of sheets printed with folder circles
   upload_key.txt     generated upload key (if NOTES_UPLOAD_KEY isn't set)
 ```
 

@@ -6,6 +6,7 @@
 3. Clean up: divide out the background (shadows, paper tint, the faint mirrored
    print showing through from the back) and push near-white to pure white.
 4. Read the QR code(s), if they decode, to learn the sheet ID.
+5. Measure how much ink is inside each folder circle on page A.
 """
 import io
 from dataclasses import dataclass, field
@@ -15,7 +16,7 @@ import numpy as np
 from PIL import Image, ImageOps
 
 from .layout import (
-    ARUCO_DICT, MARKER_IDS, PAGE_RE, SIDES, crop_box, marker_corners, marker_rect, MARKER,
+    ARUCO_DICT, CIRCLE_R, MARKER_IDS, PAGE_RE, SIDES, circle_centres, crop_box, marker_corners, marker_rect, MARKER,
 )
 
 try:  # iPhone HEIC photos; Safari usually converts to JPEG on upload, this covers the rest.
@@ -45,6 +46,7 @@ class Page:
     clean: np.ndarray      # cleaned-up colour image (BGR)
     flat: np.ndarray       # straightened, but no cleanup
     markers: int           # how many of the 3 markers were found
+    circles: list = field(default_factory=list)  # ink coverage (0-1) inside each folder circle
 
 
 @dataclass
@@ -123,6 +125,41 @@ def _hide_markers(img: np.ndarray, side: str) -> np.ndarray:
     return img
 
 
+CIRCLE_FILLED = 0.20   # share of the circle's inside covered by ink to count as filled in (empty ~0, pen dot ~0.07, X or tick ~0.4+)
+
+
+def circle_ink(cleaned: np.ndarray, side: str) -> list[float]:
+    """Ink coverage inside each folder circle (page A only), measured on the cleaned page.
+
+    Only the inside of the circle is sampled (the printed outline is left out), and only
+    dark pixels count, so the faint printed number reads as empty.
+    """
+    centres = circle_centres(side)
+    if not centres:
+        return []
+    cx0, cy0, _, _ = crop_box(side)
+    k = DPI / 72.0
+    gray = cv2.cvtColor(cleaned, cv2.COLOR_BGR2GRAY)
+    r_in = CIRCLE_R * k * 0.72
+    yy, xx = np.mgrid[-int(r_in) - 1:int(r_in) + 2, -int(r_in) - 1:int(r_in) + 2]
+    disc = (xx ** 2 + yy ** 2) <= r_in ** 2
+    out = []
+    for x, y in centres:
+        px, py = round((x - cx0) * k), round((y - cy0) * k)
+        h = disc.shape[0] // 2
+        patch = gray[py - h:py + h + 1, px - h:px + h + 1]
+        if patch.shape != disc.shape:
+            out.append(0.0)
+            continue
+        out.append(float((patch[disc] < 110).mean()))
+    return out
+
+
+def filled_circles(ink: list[float]) -> list[int]:
+    """Circle numbers (1-based) that look filled in."""
+    return [i + 1 for i, v in enumerate(ink) if v >= CIRCLE_FILLED]
+
+
 def clean(flat: np.ndarray) -> np.ndarray:
     """Even out lighting and remove paper tint / show-through, keeping pen colour."""
     out = np.empty_like(flat)
@@ -150,7 +187,9 @@ def scan(data: bytes) -> ScanResult:
         mine = {i: p for i, p in markers.items() if MARKER_IDS[i][0] == side}
         if len(mine) >= 2:
             flat = _warp(img, side, mine)
-            result.pages[side] = Page(side, _hide_markers(clean(flat), side), flat, len(mine))
+            cleaned = clean(flat)
+            ink = circle_ink(cleaned, side)
+            result.pages[side] = Page(side, _hide_markers(cleaned, side), flat, len(mine), ink)
     if not result.pages:
         raise ScanError(
             "Corner markers not found. Retake the photo with the full page in view, "

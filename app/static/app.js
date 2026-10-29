@@ -105,7 +105,7 @@ async function upload(file, sheetHint, statusEl, folderId) {
       statusEl.innerHTML = res.warnings.length
         ? res.warnings.map((w) => `<div class="notice">${esc(w)}</div>`).join("")
         : "";
-      toast(`Saved side ${res.saved_sides.join(" + ")}`);
+      toast(`Saved side ${res.saved_sides.join(" + ")}${res.filed_to ? ` · filed in “${res.filed_to}”` : ""}`);
       return res;
     } catch (e) {
       if (e.status === 401) me.can_upload = false;
@@ -180,9 +180,19 @@ async function browseView(folderId) {
   $view.innerHTML = `
     ${folder ? `
       <a class="crumb" href="/">← All notes</a>
-      <div class="row folder-head">
-        <input class="title-input" id="fname" value="${esc(folder.name)}" ${me.can_upload ? "" : "disabled"} aria-label="Folder name">
-        ${me.can_upload ? `<button class="btn danger" id="fdel">Delete folder</button>` : ""}
+      <input class="title-input" id="fname" value="${esc(folder.name)}" ${me.can_upload ? "" : "disabled"} aria-label="Folder name">
+      <div class="folder-head">
+        <div class="btn-row" style="--n:${me.can_upload ? 2 : 1}">
+          <select class="btn" id="fcircle" aria-label="Circle on the sheet that files into this folder" ${me.can_upload ? "" : "disabled"}>
+            <option value="">No circle linked</option>
+            ${[1, 2, 3, 4, 5].map((n) => {
+              const other = folders.find((f) => f.circle === n && f.id !== folder.id);
+              return `<option value="${n}" ${folder.circle === n ? "selected" : ""}>Circle ${String(n).padStart(2, "0")}${other ? ` (now ${esc(other.name)})` : ""}</option>`;
+            }).join("")}
+          </select>
+          ${me.can_upload ? `<button class="btn danger" id="fdel">Delete folder</button>` : ""}
+        </div>
+        <p class="hint">Fill in this circle on page A of a sheet and its scan is filed here automatically.</p>
       </div>` : ""}
     <div class="toolbar">
       <input type="search" id="q" placeholder="${folder ? "Search this folder" : "Search all notes"}" autocomplete="off">
@@ -221,7 +231,8 @@ async function browseView(folderId) {
     if (!folder && !q && folders.length) {
       html += `<h2 class="section">Folders</h2><div class="folders">${folders.map((f) => {
         const n = sheets.filter((s) => s.folder === f.id).length;
-        return `<a class="folder" href="/f/${f.id}">${FOLDER_ICON}<span class="fn">${esc(f.name)}</span><span class="fc">${n}</span></a>`;
+        const badge = f.circle ? `<span class="fbadge" title="Circle ${String(f.circle).padStart(2, "0")}">${String(f.circle).padStart(2, "0")}</span>` : "";
+        return `<a class="folder" href="/f/${f.id}">${FOLDER_ICON}<span class="fn">${esc(f.name)}</span>${badge}<span class="fc">${n}</span></a>`;
       }).join("")}</div>`;
     }
     if (!folder && !q && folders.length) html += `<h2 class="section">Not in a folder</h2>`;
@@ -305,6 +316,15 @@ async function browseView(folderId) {
     $n.onchange = async () => {
       try { folder = (await api(`/api/folders/${folder.id}`, jsonOpts("PATCH", { name: $n.value }))).folder; $n.value = folder.name; toast("Folder renamed"); }
       catch (e) { $n.value = folder.name; toast(e.message); }
+    };
+    const $c = document.getElementById("fcircle");
+    $c.onchange = async () => {
+      const circle = $c.value ? +$c.value : null;
+      try {
+        folder = (await api(`/api/folders/${folder.id}`, jsonOpts("PATCH", { circle }))).folder;
+        toast(circle ? `Circle ${String(circle).padStart(2, "0")} now files into “${folder.name}”` : "Circle unlinked");
+      } catch (e) { toast(e.message); }
+      browseView(folder.id);
     };
     const $d = document.getElementById("fdel");
     if ($d) $d.onclick = async () => {

@@ -15,7 +15,7 @@ from starlette.staticfiles import StaticFiles
 
 from . import config, storage
 from .layout import PAGE_RE, SHEET_RE, SIDES
-from .scan import ScanError, scan
+from .scan import ScanError, filled_circles, scan
 from .template import build_pdf as build_template, new_ids
 
 STATIC = Path(__file__).parent / "static"
@@ -124,7 +124,8 @@ async def api_folder(request: Request):
     try:
         if request.method == "PATCH":
             body = await request.json()
-            return JSONResponse({"folder": storage.rename_folder(fid, body.get("name", ""))})
+            changes = {k: body[k] for k in ("name", "circle") if k in body}
+            return JSONResponse({"folder": storage.update_folder(fid, **changes)})
         if request.method == "DELETE":
             return JSONResponse({"moved": storage.delete_folder(fid)})
     except KeyError:
@@ -174,8 +175,26 @@ async def api_upload(request: Request):
         if page.markers < 3:
             warnings.append(f"Side {side}: {page.markers} of 3 corner markers found. The page may be slightly skewed.")
 
-    meta = await run_in_threadpool(storage.save_scan, sid, data, result, folder)
-    return JSONResponse({"sheet": meta, "saved_sides": sorted(result.pages), "warnings": warnings})
+    # Folder circles (page A of sheets printed with them)
+    circle = circle_folder = filed_to = None
+    page_a = result.pages.get("A")
+    if page_a is not None and page_a.circles and storage.has_circles(sid):
+        filled = filled_circles(page_a.circles)
+        circle = filled[0] if len(filled) == 1 else None
+        if len(filled) > 1:
+            nums = ", ".join(f"{n:02d}" for n in filled)
+            warnings.append(f"More than one circle is filled in ({nums}). The note was not filed.")
+        elif circle:
+            f = storage.folder_for_circle(circle)
+            if f:
+                circle_folder, filed_to = f["id"], f["name"]
+            else:
+                warnings.append(f"Circle {circle:02d} is filled in but is not linked to a folder. "
+                                "Link it from the folder's page.")
+
+    meta = await run_in_threadpool(storage.save_scan, sid, data, result, folder, circle_folder, circle)
+    return JSONResponse({"sheet": meta, "saved_sides": sorted(result.pages), "warnings": warnings,
+                         "filed_to": filed_to})
 
 
 # --- files --------------------------------------------------------------------
@@ -219,6 +238,7 @@ async def template_pdf(request: Request):
         return _err("count must be 1-500.")
     ids = new_ids(count, storage.existing_ids())
     pdf = await run_in_threadpool(build_template, ids)
+    storage.record_circle_sheets(ids)
     name = f"notes-sheets-{count}.pdf"
     return Response(pdf, media_type="application/pdf",
                     headers={"Content-Disposition": f'inline; filename="{name}"'})

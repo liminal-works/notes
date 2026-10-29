@@ -146,8 +146,13 @@ h1 { font-size: 22px; margin: 4px 0 2px; letter-spacing: -.01em; }
 .folder .fc { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
 .crumb { display: inline-block; color: var(--muted); text-decoration: none; font-size: 14px; margin-bottom: 4px; }
 .crumb:hover { color: var(--ink); }
-.folder-head { flex-wrap: nowrap; margin-bottom: 12px; }
-.folder-head .title-input { flex: 1; min-width: 0; }
+.folder-head { margin: 6px 0 16px; }
+.folder-head .hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+@media (min-width: 760px) { .folder-head .btn-row { grid-template-columns: repeat(var(--n, 2), 220px); } }
+.fbadge {
+  font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 999px; padding: 3px 6px;
+}
 .selbar { display: grid; gap: 8px; margin-bottom: 14px; }
 .selcount { color: var(--muted); font-size: 14px; }
 @media (min-width: 760px) {

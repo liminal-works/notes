@@ -29,6 +29,19 @@ RULE_BOTTOM = PAGE_H / 2               # page A: last line at the middle of the 
 # (a line touching a marker could stop it from being detected).
 RULE_BOTTOM_FULL = PAGE_H - MARGIN - MARKER - 0.15 * INCH
 
+# Title line: between the top-left marker and the QR code, level with the marker's bottom edge.
+TITLE_GAP = 0.22 * INCH
+
+# Faint dot grid filling page A's blank bottom half.
+DOT_STEP = 0.25 * INCH
+
+# Folder circles 01-05 along the bottom of page A, between the bottom corner markers.
+# Filling one in files the scan into the folder linked to that number.
+CIRCLE_COUNT = 5
+CIRCLE_R = 0.07 * INCH
+CIRCLE_SIDE = "A"
+STRIP_GAP = 0.28 * INCH  # clearance between the strip and the markers
+
 ARUCO_DICT = cv2.aruco.DICT_4X4_50
 
 # Each half has its QR in the top-right corner and ArUco markers in the other three.
@@ -90,3 +103,38 @@ def rule_lines(side: str):
     bottom = RULE_BOTTOM if side == "A" else RULE_BOTTOM_FULL
     n = int((bottom - RULE_TOP) // RULE_SPACING) + 1
     return [(x0, x1, RULE_TOP + k * RULE_SPACING) for k in range(n)]
+
+
+def title_line(side: str):
+    """(x0, x1, y) of the title line."""
+    x0 = half_left(side) + MARGIN + MARKER + TITLE_GAP
+    x1 = qr_rect(side)[0] - TITLE_GAP
+    return x0, x1, MARGIN + MARKER
+
+
+def dot_grid(side: str):
+    """Dot centres for page A's bottom half (empty list for page B)."""
+    if side != "A":
+        return []
+    left, right = half_left(side) + MARGIN, half_left(side) + HALF_W - MARGIN
+    bottom = PAGE_H - MARGIN - MARKER - 0.25 * INCH
+    dots, y = [], RULE_BOTTOM + DOT_STEP
+    while y <= bottom + 0.01:
+        x = left
+        while x <= right + 0.01:
+            dots.append((x, y))
+            x += DOT_STEP
+        y += DOT_STEP
+    return dots
+
+
+def circle_centres(side: str = CIRCLE_SIDE):
+    """Centres of the folder circles 1..5, in sheet coordinates (empty for the other page)."""
+    if side != CIRCLE_SIDE:
+        return []
+    x0 = half_left(side)
+    left = x0 + MARGIN + MARKER + STRIP_GAP
+    right = x0 + HALF_W - MARGIN - MARKER - STRIP_GAP
+    y = PAGE_H - MARGIN - MARKER / 2
+    slot = (right - left) / CIRCLE_COUNT
+    return [(left + slot * (i + 0.5), y) for i in range(CIRCLE_COUNT)]

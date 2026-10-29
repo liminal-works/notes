@@ -6,7 +6,8 @@ data/
     A.jpg  A.thumb.jpg   cleaned page + thumbnail
     A.flat.jpg           straightened only (no cleanup), in case the cleanup ate light pencil
     originals/A-20261027-104500.jpg
-  folders.json           [{"id": "f1a2b3c", "name": "Repair notes", "created": ...}]
+  folders.json           [{"id": "f1a2b3c", "name": "Repair notes", "circle": 1, "created": ...}]
+  circle_sheets.json     IDs of sheets printed with folder circles (older sheets have none)
   unmatched/             photos where no markers were found, kept for debugging
 
 A sheet's "folder" is a folder id, or null for notes that aren't in a folder.
@@ -23,7 +24,7 @@ from pathlib import Path
 import img2pdf
 
 from . import config
-from .layout import SHEET_RE, SIDES
+from .layout import CIRCLE_COUNT, SHEET_RE, SIDES
 from .scan import DPI, ScanResult, encode_jpeg, thumbnail
 
 _lock = threading.RLock()
@@ -83,7 +84,8 @@ def _write_meta(sid: str, meta: dict):
     _write_atomic(sheet_dir(sid) / "meta.json", json.dumps(meta, indent=2).encode())
 
 
-def save_scan(sid: str, original: bytes, result: ScanResult, folder: str | None = None) -> dict:
+def save_scan(sid: str, original: bytes, result: ScanResult, folder: str | None = None,
+              circle_folder: str | None = None, circle: int | None = None) -> dict:
     sid = norm_id(sid)
     d = sheet_dir(sid)
     stamp = _stamp()
@@ -97,9 +99,14 @@ def save_scan(sid: str, original: bytes, result: ScanResult, folder: str | None 
             meta["sides"][side] = {"updated": _now(), "scans": prev.get("scans", 0) + 1, "markers": page.markers}
         sides = "".join(sorted(result.pages))
         _write_atomic(d / "originals" / f"{sides}-{stamp}.jpg", original)
-        # Scanning from inside a folder files an unfiled sheet there.
-        if folder and not meta.get("folder") and get_folder(folder):
+        # A filled-in circle on the paper wins; otherwise scanning from inside a
+        # folder files an unfiled sheet there.
+        if circle_folder and get_folder(circle_folder):
+            meta["folder"] = circle_folder
+        elif folder and not meta.get("folder") and get_folder(folder):
             meta["folder"] = folder
+        if circle is not None:
+            meta["circle"] = circle
         meta["uploaded"] = meta["updated"] = _now()
         _write_meta(sid, meta)
     return meta
@@ -216,15 +223,53 @@ def create_folder(name: str) -> dict:
     return folder
 
 
-def rename_folder(fid: str, name: str) -> dict:
+def update_folder(fid: str, name=_UNSET, circle=_UNSET) -> dict:
+    """Rename a folder and/or link it to a circle number (1-5, or None to unlink)."""
     with _lock:
         folders = list_folders()
         folder = next((f for f in folders if f["id"] == fid), None)
         if folder is None:
             raise KeyError(fid)
-        folder["name"] = _clean_name(name, folders, skip=fid)
+        if name is not _UNSET:
+            folder["name"] = _clean_name(name, folders, skip=fid)
+        if circle is not _UNSET:
+            if circle is not None:
+                try:
+                    circle = int(circle)
+                except (TypeError, ValueError):
+                    raise ValueError("Circle must be a number from 1 to 5.")
+                if not 1 <= circle <= CIRCLE_COUNT:
+                    raise ValueError("Circle must be a number from 1 to 5.")
+                for f in folders:  # a circle belongs to one folder at a time
+                    if f.get("circle") == circle:
+                        f["circle"] = None
+            folder["circle"] = circle
         _save_folders(folders)
     return folder
+
+
+def folder_for_circle(n: int) -> dict | None:
+    return next((f for f in list_folders() if f.get("circle") == n), None)
+
+
+# --- which sheets have folder circles -----------------------------------------
+
+def _circle_sheets_path() -> Path:
+    return config.DATA_DIR / "circle_sheets.json"
+
+
+def record_circle_sheets(ids: list[str]):
+    """Remember sheet IDs printed with folder circles, so older sheets are never read for them."""
+    with _lock:
+        p = _circle_sheets_path()
+        known = set(json.loads(p.read_text())) if p.exists() else set()
+        known.update(i.upper() for i in ids)
+        _write_atomic(p, json.dumps(sorted(known)).encode())
+
+
+def has_circles(sid: str) -> bool:
+    p = _circle_sheets_path()
+    return p.exists() and sid.upper() in set(json.loads(p.read_text()))
 
 
 def delete_folder(fid: str) -> int:

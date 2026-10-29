@@ -21,6 +21,10 @@ Self-hosted scrap-paper notes scanner. Read README.md for the full picture.
 - Sheet IDs are `S` + 4–8 hex digits. New sheets get 8 random hex digits. The first printed batch is
   S0001–S0050 (decimal digits are valid hex) and must stay valid.
 - Existing `meta.json` files in `/var/lib/notes/sheets/` must load without migration.
+- Folder circles are only read for sheet IDs in `data/circle_sheets.json` (recorded when the template is
+  generated). Sheets printed before the circles existed must never be read for them.
+- Template geometry (markers, QR, lines, circles) lives in `app/layout.py` and is shared by the template
+  and the scanner; keep them in sync.
 - Phone uploads are shrunk client-side (1600 px, JPEG 0.8) because the user's signal at work is weak.
 
 ## Style
