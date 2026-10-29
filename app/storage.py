@@ -12,6 +12,7 @@ data/
 
 A sheet's "folder" is a folder id, or null for notes that aren't in a folder.
 """
+import io
 import json
 import os
 import secrets
@@ -180,6 +181,39 @@ def build_pdf(sids: list[str]) -> bytes:
         raise KeyError("no pages")
     layout = img2pdf.get_fixed_dpi_layout_fun((DPI, DPI))
     return img2pdf.convert(pages, layout_fun=layout)
+
+
+def build_print_pdf(sids: list[str]) -> bytes:
+    """Reprint layout: one landscape letter page per sheet, page A on the left and page B on
+    the right, each at its original printed size and position, with the fold line."""
+    from reportlab.lib.colors import Color
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfgen import canvas
+
+    from .layout import FOLD_X, PAGE_H, PAGE_W, crop_box
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=(PAGE_W, PAGE_H))
+    c.setTitle(sids[0] if len(sids) == 1 else f"Notes ({len(sids)} sheets)")
+    pages = 0
+    for sid in sids:
+        sides = [s for s in SIDES if page_path(sid, s).exists()]
+        if not sides:
+            continue
+        for side in sides:
+            x, y, w, h = crop_box(side)
+            c.drawImage(ImageReader(str(page_path(sid, side))), x, PAGE_H - y - h, w, h)
+        c.setStrokeColor(Color(0.6, 0.6, 0.6))
+        c.setLineWidth(0.6)
+        c.setDash(1, 4)
+        c.line(FOLD_X, 0.3 * 72, FOLD_X, PAGE_H - 0.3 * 72)
+        c.setDash()
+        c.showPage()
+        pages += 1
+    if not pages:
+        raise KeyError("no pages")
+    c.save()
+    return buf.getvalue()
 
 
 def existing_ids() -> set[str]:

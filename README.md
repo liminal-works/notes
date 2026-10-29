@@ -104,10 +104,11 @@ Back up the `data/` folder and you've backed up everything.
 |---|---|
 | `/` | All notes, newest first. Search, select several, download as one PDF. |
 | `/f/<folder id>` | One folder. Rename or delete it. |
-| `/s/S3F9A1C07-A` | One sheet (what the QR opens). Scan, rename, move to a folder, open/download PDF, delete. |
+| `/s/S3F9A1C07-A` | One sheet (what the QR opens). Scan, rename, move to a folder, print, open/download PDF, delete. |
 | `/print` | Make a template PDF of fresh random-ID sheets. |
 | `/pdf/S3F9A1C07.pdf` | PDF of one sheet (side A then B). Add `?download=1` to download. |
 | `/pdf?ids=S3F9A1C07,S0012` | Several sheets in one PDF. |
+| `…pdf?layout=print` | Reprint layout: page A and B side by side on one landscape letter page, at original size, with the fold line. Print at 100%. |
 | `/template.pdf?count=50` | Template sheets. |
 
 Viewing and downloading are open. **Uploading, renaming, folders and deleting need the

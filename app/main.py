@@ -219,11 +219,16 @@ async def sheet_pdf(request: Request):
     if not sids or not all(storage.valid_id(s) for s in sids):
         return _err("Bad sheet list.", 400)
     sids = [s.upper() for s in sids]
+    # layout=print: both pages side by side on one letter sheet, at original size, for reprinting
+    printable = request.query_params.get("layout") == "print"
+    build = storage.build_print_pdf if printable else storage.build_pdf
     try:
-        pdf = await run_in_threadpool(storage.build_pdf, sids)
+        pdf = await run_in_threadpool(build, sids)
     except KeyError:
         return _err("No scanned pages for the selected sheets.", 404)
     name = sids[0] if len(sids) == 1 else f"notes-{len(sids)}-sheets"
+    if printable:
+        name += "-print"
     disp = "attachment" if request.query_params.get("download") else "inline"
     return Response(pdf, media_type="application/pdf",
                     headers={"Content-Disposition": f'{disp}; filename="{name}.pdf"'})

@@ -66,7 +66,8 @@ h1 { font-size: 22px; margin: 4px 0 2px; letter-spacing: -.01em; }
 .spacer { flex: 1; }
 
 /* Rows of equal-width buttons that fill the line. Set --n to the number of buttons. */
-.btn-row { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 8px; }
+/* --m (optional) sets the column count on phones, e.g. 4 buttons as a 2x2 grid. */
+.btn-row { display: grid; grid-template-columns: repeat(var(--m, var(--n, 2)), minmax(0, 1fr)); gap: 8px; }
 .btn-row > .btn, .btn-row > input { width: 100%; min-width: 0; }
 .btn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -157,12 +158,12 @@ h1 { font-size: 22px; margin: 4px 0 2px; letter-spacing: -.01em; }
 .selcount { color: var(--muted); font-size: 14px; }
 @media (min-width: 760px) {
   .selbar { grid-template-columns: 1fr auto; align-items: center; }
-  .selbar .btn-row { grid-template-columns: repeat(var(--n, 3), 160px); }
+  .selbar .btn-row { grid-template-columns: repeat(var(--n, 3), 150px); }
 }
 
 /* Note page actions: folder menu on its own line, then equal buttons (phones);
    all on one line on wider screens. */
-.sheet-actions { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.sheet-actions { display: grid; grid-template-columns: repeat(var(--m, var(--n, 3)), minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
 .sheet-actions > * { width: 100%; min-width: 0; }
 .sheet-actions > select { grid-column: 1 / -1; }
 @media (min-width: 760px) {

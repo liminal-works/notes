@@ -204,8 +204,9 @@ async function browseView(folderId) {
     </div>
     <div class="selbar" id="selbar" hidden>
       <div id="selcount" class="selcount">0 selected</div>
-      <div class="btn-row" style="--n:3">
+      <div class="btn-row" style="--n:4; --m:2">
         <select class="btn" id="selmove" aria-label="Move selected notes"></select>
+        <a class="btn" id="selprint" target="_blank" title="Both pages of each sheet on one page, at original size">Print</a>
         <a class="btn" id="selopen" target="_blank">Open PDF</a>
         <a class="btn primary" id="seldl">Download</a>
       </div>
@@ -251,10 +252,11 @@ async function browseView(folderId) {
     const ids = [...picked].join(",");
     document.getElementById("selbar").hidden = !selecting;
     document.getElementById("selcount").textContent = `${picked.size} selected`;
-    for (const id of ["selopen", "seldl"]) {
+    const extra = { selopen: "", seldl: "&download=1", selprint: "&layout=print" };
+    for (const id of Object.keys(extra)) {
       const a = document.getElementById(id);
       a.classList.toggle("disabled", !picked.size);
-      a.href = picked.size ? `/pdf?ids=${ids}${id === "seldl" ? "&download=1" : ""}` : "#";
+      a.href = picked.size ? `/pdf?ids=${ids}${extra[id]}` : "#";
     }
     const mv = document.getElementById("selmove");
     mv.disabled = !picked.size;
@@ -363,12 +365,13 @@ async function sheetView(page) {
       <p class="sub">${sid}${sheet ? ` · uploaded ${when(sheet.uploaded)}` : " · nothing scanned yet"}</p>
       <button class="btn primary big" id="scan">${qrSide ? `Scan side ${qrSide}` : "Scan this sheet"}</button>
       <div id="scanstatus"></div>
-      ${hasPages ? `<div class="sheet-actions" style="--n:${me.can_upload ? 3 : 2}">
+      ${hasPages ? `<div class="sheet-actions" style="--n:${me.can_upload ? 4 : 3}; --m:${me.can_upload ? 2 : 3}">
         <select class="btn" id="folder" aria-label="Folder" ${me.can_upload ? "" : "disabled"}>
           <option value="">No folder</option>
           ${folders.map((f) => `<option value="${f.id}" ${f.id === sheet.folder ? "selected" : ""}>${esc(f.name)}</option>`).join("")}
           <option value="__new">New folder…</option>
         </select>
+        <a class="btn" href="/pdf/${sid}.pdf?layout=print&v=${v}" target="_blank" title="Both pages on one sheet, at original size">Print</a>
         <a class="btn" href="/pdf/${sid}.pdf?v=${v}" target="_blank">Open PDF</a>
         <a class="btn" href="/pdf/${sid}.pdf?download=1&v=${v}">Download</a>
         ${me.can_upload ? `<button class="btn danger" id="del">Delete</button>` : ""}
